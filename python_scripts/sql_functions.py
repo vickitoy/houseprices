@@ -230,9 +230,33 @@ def ushouse(month='1996_06'):
     engine = sqlalchemy.create_engine('mysql://'+passdict[db][0]+':'+passdict[db][1]+'@localhost/'+db, echo=False)    
     conn=engine.connect()
 
-    sql = 'SELECT state,AVG(%s) from medhousesold WHERE %s >0 GROUP BY state;' % (month, month)
+    sql = 'SELECT state,AVG(%s) as avg_house from medhousesold WHERE %s >0 GROUP BY state;' % (month, month)
     
     ush = pd.read_sql_query(sql, conn)
     
     return ush
+
+def stateabbr():
+    """
+    NAME:
+        stateabbr
+    PURPOSE:
+        Direct SQL query to find average of each state (removing zip codes with no sold houses)
+        and returning pandas dataframe
+    INPUT:
+        month - month to run query for in YYYY_MM format
+    """
+
+    passdict = password_ret(passfile=passfile)
     
+    # connect(host, database username, password, database)
+    db = 'testdb'
+    
+    engine = sqlalchemy.create_engine('mysql://'+passdict[db][0]+':'+passdict[db][1]+'@localhost/'+db, echo=False)    
+    conn=engine.connect()
+
+    sql = 'SELECT * from states;'
+    
+    states = pd.read_sql_query(sql, conn)
+    
+    return states
