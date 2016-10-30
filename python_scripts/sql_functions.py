@@ -4,11 +4,22 @@ import matplotlib.pyplot as plt
 import csv
 import MySQLdb as mdb
 import re
-
+import sqlalchemy
+from sqlalchemy.ext.automap import automap_base
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy import func
 
 passfile = '/Users/vickitoy/sideprojects/houseprices/password.txt'
 
 def password_ret(passfile=passfile):
+    """
+    NAME:
+        password_ret
+    PURPOSE:
+        Parse password text file into dictionary
+    INPUT:
+        passfile - password txt file that is formated (database, username, password)
+    """
     
     passdict = {}
     with open(passfile, 'r') as f:
@@ -19,6 +30,17 @@ def password_ret(passfile=passfile):
     return passdict
 
 def makesqltable(tablename, csvfile):
+    """
+    NAME:
+        makesqltable
+    PURPOSE:
+        Makes mySQL table for Zillow median sold houses files, makes ID auto-incremented
+    INPUTS:
+        tablename - name of table to make
+        csvfile   - file with csv data
+    ASSUMPTIONS:    
+        csvfile has a header for first line
+    """
     
     passdict = password_ret(passfile=passfile)
     
@@ -135,3 +157,82 @@ def makesqltable(tablename, csvfile):
                         2016_01, 2016_02, 2016_03, 2016_04, 2016_05, 2016_06)
                         SET ID = NULL;;"""  % (tablename)               
         cur.execute(sqlload.format(csvfile))
+        
+def statequery(stid='MD'):
+    """
+    NAME:
+        statequery
+    PURPOSE:
+        Performs a query on the "medhousesold" table in mySQL to group based on state
+    INPUT:
+        stid - abbreviated state id
+    OUTPUT:
+        statehouse - query to mySQL
+    """
+    Base = automap_base()
+    
+    passdict = password_ret(passfile=passfile)
+    
+    # connect(host, database username, password, database)
+    db = 'testdb'
+    
+    engine = sqlalchemy.create_engine('mysql://'+passdict[db][0]+':'+passdict[db][1]+'@localhost/'+db, echo=False)   
+    
+    Session = sessionmaker()
+    session = Session()
+    
+    # Reflect means grab all existing tables from engine (prepare them into same class as base)
+    Base.prepare(engine, reflect=True)
+    
+    ################## Query for all columns for a state ##################
+    house = Base.classes.medhousesold
+    statehouse = session.query(*[c for c in house.__table__.c]).filter(house.state == stid)
+    
+    return statehouse
+
+def statehouse():
+    """
+    NAME:
+        statehouse
+    PURPOSE:
+        Runs query with pandas and returns a pandas dataframe from query
+    """
+    passdict = password_ret(passfile=passfile)
+    
+    # connect(host, database username, password, database)
+    db = 'testdb'
+    
+    engine = sqlalchemy.create_engine('mysql://'+passdict[db][0]+':'+passdict[db][1]+'@localhost/'+db, echo=False)    
+    conn=engine.connect()
+
+    a = statequery()
+    
+    sh = pd.read_sql(a.statement, conn)
+    
+    return sh
+       
+def ushouse(month='1996_06'):
+    """
+    NAME:
+        ushouse
+    PURPOSE:
+        Direct SQL query to find average of each state (removing zip codes with no sold houses)
+        and returning pandas dataframe
+    INPUT:
+        month - month to run query for in YYYY_MM format
+    """
+
+    passdict = password_ret(passfile=passfile)
+    
+    # connect(host, database username, password, database)
+    db = 'testdb'
+    
+    engine = sqlalchemy.create_engine('mysql://'+passdict[db][0]+':'+passdict[db][1]+'@localhost/'+db, echo=False)    
+    conn=engine.connect()
+
+    sql = 'SELECT state,AVG(%s) from medhousesold WHERE %s >0 GROUP BY state;' % (month, month)
+    
+    ush = pd.read_sql_query(sql, conn)
+    
+    return ush
+    
